@@ -1,0 +1,31 @@
+exporter:
+  port: 9876
+  collect_interval: 60        # seconds between collect cycles
+  timezone: UTC               # used for working_hours_*
+
+elasticsearch:
+  url: https://elasticsearch.example.com:9200
+  index: app-logs-*           # default index pattern, can be overridden per metric
+  timestamp_field: "@timestamp"
+  timeout: 30
+  verify_ssl: true
+  # ca_bundle: /etc/ssl/custom/ca.crt
+
+metrics:
+  # Number of error log lines of one service in the last 5 minutes
+  - name: app_payment_errors_5m
+    description: Error log lines of the payment service in the last 5 minutes
+    query: 'service:"payment" AND level:"ERROR"'
+    lookback_minutes: 5
+
+  # Heartbeat: a scheduled job must log at least once an hour during the day.
+  # At night the metric is pinned to off_hours_value, so "no logs" alerts stay quiet.
+  - name: app_export_job_runs_1h
+    description: Runs of the export job in the last hour
+    query: 'message:"export finished"'
+    index: batch-logs-*
+    lookback_minutes: 60
+    working_hours_only: true
+    working_hours_start: 6
+    working_hours_end: 22
+    off_hours_value: 1

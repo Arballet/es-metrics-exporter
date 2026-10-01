@@ -1,0 +1,85 @@
+# Example manifests. The exporter is stateless: every replica runs the same
+# queries, so two replicas give availability at the cost of double load on Elasticsearch.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: es-metrics-exporter
+type: Opaque
+stringData:
+  ELASTIC_USER: "<user>"
+  ELASTIC_PASSWORD: "<password>"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: es-metrics-exporter
+data:
+  config.yaml: |
+    exporter:
+      port: 9876
+      collect_interval: 60
+    elasticsearch:
+      url: https://elasticsearch.example.com:9200
+      index: app-logs-*
+    metrics:
+      - name: app_payment_errors_5m
+        description: Error log lines of the payment service in the last 5 minutes
+        query: 'service:"payment" AND level:"ERROR"'
+        lookback_minutes: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: es-metrics-exporter
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: es-metrics-exporter
+  template:
+    metadata:
+      labels:
+        app: es-metrics-exporter
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9876"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: es-metrics-exporter
+          image: es-metrics-exporter:latest
+          ports:
+            - name: metrics
+              containerPort: 9876
+          envFrom:
+            - secretRef:
+                name: es-metrics-exporter
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+            limits:
+              memory: 96Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: config
+          configMap:
+            name: es-metrics-exporter

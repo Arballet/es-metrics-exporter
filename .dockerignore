@@ -1,0 +1,17 @@
+.git
+.gitignore
+.dockerignore
+.env
+.env.example
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+venv
+Dockerfile
+LICENSE
+*.md
+tests/
+deploy/
+config.yaml
+config.example.yaml
